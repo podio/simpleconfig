@@ -17,33 +17,29 @@ pipeline {
         stage('TruffleHog Scan') {
             steps {
                 script {
-                    try {
-                        echo "Running TruffleHog scan..."
-                        sh '''
-                            docker run --rm -v ${WORKSPACE}:/usr/src \
-                                artifacts.progress.com/ci-local-docker/trufflesecurity/trufflehog:3.88.29-amd64 \
-                                git file:/usr/src \
-                                --results=verified,unknown \
-                                --force-skip-binaries \
-                                --force-skip-archives \
-                                --json \
-                                --no-update \
-                                > trufflehog_report.json
-                        '''
-                        echo "📄 TruffleHog scan completed. Output saved to trufflehog_report.json"
-                        def found = sh(
-                            script: 'grep -q \'"SourceMetadata"\' trufflehog_report.json',
-                            returnStatus: true
-                        )
-                        if (found == 0) {
-                            echo "❌ TruffleHog found potential secrets!"
-                            sh 'cat trufflehog_report.json'
-                            error("Secrets detected")
-                        } else {
-                            echo "✅ No secrets found."
-                        }
-                    } catch (Exception e) {
-                        echo "TruffleHog scan failed: ${e.getMessage()}"
+                    echo "Running TruffleHog scan..."
+                    sh '''
+                        docker run --rm -v ${WORKSPACE}:/usr/src \
+                            artifacts.progress.com/ci-local-docker/trufflesecurity/trufflehog:3.88.29-amd64 \
+                            git file:/usr/src \
+                            --results=verified,unknown \
+                            --force-skip-binaries \
+                            --force-skip-archives \
+                            --json \
+                            --no-update \
+                            > trufflehog_report.json
+                    '''
+                    echo "📄 TruffleHog scan completed. Output saved to trufflehog_report.json"
+                    def secretsFound = sh(
+                        script: 'grep -q \'"SourceMetadata"\' trufflehog_report.json',
+                        returnStatus: true
+                    )
+                    if (secretsFound == 0) {
+                        echo "❌ TruffleHog found potential secrets!"
+                        sh 'cat trufflehog_report.json'
+                        error("❌ TruffleHog scan failed, potential secrets detected in the repository.")
+                    } else {
+                        echo "✅ TruffleHog scan passed - No secrets detected."
                     }
                 }
             }
